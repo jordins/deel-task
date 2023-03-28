@@ -1,9 +1,9 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-const { sequelize, Job } = require("./model");
+const { sequelize } = require("./model");
 const { getProfile } = require("./middleware/getProfile");
 const { Op } = require("sequelize");
-const { payJob } = require("./service/job.service");
+const { listUnpaidJobs, payJob } = require("./service/job.service");
 const app = express();
 app.use(bodyParser.json());
 app.set("sequelize", sequelize);
@@ -59,37 +59,12 @@ app.get("/contracts", getProfile, async (req, res) => {
  * @returns a list of unpaid jobs belonging to a client or contractor
  */
 app.get("/jobs/unpaid", getProfile, async (req, res) => {
-  const { Contract } = req.app.get("models");
-  const contracts = await Contract.findAll({
-    where: {
-      [Op.and]: [
-        { status: { [Op.eq]: "in_progress" } },
-        {
-          [Op.or]: [
-            { ContractorId: req.profile.id },
-            { ClientId: req.profile.id },
-          ],
-        },
-      ],
-    },
-    include: {
-      model: Job,
-      required: true,
-      where: {
-        paid: {
-          [Op.not]: true,
-        },
-      },
-      attributes: { exclude: [] },
-    },
-    attributes: [],
-  });
-  if (!contracts || contracts.length === 0) return res.status(404).end();
-  const unpaidJobs = [];
-  contracts.forEach((c) => {
-    unpaidJobs.push(...c.Jobs);
-  });
-  res.json(unpaidJobs);
+  const unpaidJobsResult = await listUnpaidJobs(req.profile);
+  if (unpaidJobsResult.type === "JOBS_NOT_FOUND") {
+    console.log(unpaidJobsResult.message);
+    return res.status(404).end();
+  }
+  res.json(unpaidJobsResult.data);
 });
 
 /**

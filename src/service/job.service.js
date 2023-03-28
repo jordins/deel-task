@@ -2,6 +2,45 @@ const { sequelize, Job, Contract, Profile } = require("../model");
 const { Op } = require("sequelize");
 const { Result } = require("./result");
 
+const listUnpaidJobs = async (profile) => {
+  const contracts = await Contract.findAll({
+    where: {
+      [Op.and]: [
+        { status: { [Op.eq]: "in_progress" } },
+        {
+          [Op.or]: [{ ContractorId: profile.id }, { ClientId: profile.id }],
+        },
+      ],
+    },
+    include: {
+      model: Job,
+      required: true,
+      where: {
+        paid: {
+          [Op.not]: true,
+        },
+      },
+      attributes: { exclude: [] },
+    },
+    attributes: [],
+  });
+  if (!contracts || contracts.length === 0) {
+    return new Result(
+      "JOBS_NOT_FOUND",
+      `Unpaid jobs for profileId=${profile.id} not found`
+    );
+  }
+  const unpaidJobs = [];
+  contracts.forEach((c) => {
+    unpaidJobs.push(...c.Jobs);
+  });
+  return new Result(
+    "JOBS_FOUND",
+    `Found unpaid jobs for profileId=${profile.id}`,
+    unpaidJobs
+  );
+};
+
 const payJob = async (jobId, profile) => {
   const clientId = profile.id;
   const job = await Job.findOne({
@@ -65,5 +104,6 @@ const payJob = async (jobId, profile) => {
 };
 
 module.exports = {
-  payJob: payJob,
+  listUnpaidJobs,
+  payJob,
 };
