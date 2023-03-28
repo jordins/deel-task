@@ -3,6 +3,7 @@ const bodyParser = require("body-parser");
 const { sequelize, Job } = require("./model");
 const { getProfile } = require("./middleware/getProfile");
 const { Op } = require("sequelize");
+const { payJob } = require("./service/job.service");
 const app = express();
 app.use(bodyParser.json());
 app.set("sequelize", sequelize);
@@ -89,6 +90,33 @@ app.get("/jobs/unpaid", getProfile, async (req, res) => {
     unpaidJobs.push(...c.Jobs);
   });
   res.json(unpaidJobs);
+});
+
+/**
+ * Pay for a job from client to contractor
+ */
+app.post("/jobs/:job_id/pay", getProfile, async (req, res) => {
+  const jobId = req.params.job_id;
+
+  try {
+    const result = await payJob(jobId, req.profile);
+    console.log(result.message);
+    if (result.type === "JOB_NOT_FOUND") {
+      return res.status(404).end();
+    }
+    if (result.type === "NOT_ENOUGH_FUNDS") {
+      return res.status(400).end();
+    }
+    if (result.type === "PAYMENT_DONE") {
+      return res.status(204).end();
+    }
+    if (result.type === "PAYMENT_FAILED") {
+      return res.status(500).end();
+    }
+  } catch (error) {
+    console.error(`ERROR ${error}`);
+    return res.status(500).end();
+  }
 });
 
 module.exports = app;
