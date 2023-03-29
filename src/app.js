@@ -4,6 +4,7 @@ const { sequelize } = require("./model");
 const { getProfile } = require("./middleware/getProfile");
 const { Op } = require("sequelize");
 const { listUnpaidJobs, payJob } = require("./service/job.service");
+const { getBestProfession } = require("./service/admin.service");
 const { depositMoney } = require("./service/profile.service");
 const app = express();
 app.use(bodyParser.json());
@@ -135,6 +136,24 @@ app.post("/balances/deposit/:userId", getProfile, async (req, res) => {
   if (result.type === "DEPOSIT_DONE") {
     return res.status(204).end();
   }
+});
+
+app.get("/admin/best-profession", getProfile, async (req, res) => {
+  if (!req.query.start || !req.query.end) {
+    return res.status(400).json({
+      error: `missing params`,
+    });
+  }
+  const start = new Date(req.query.start);
+  const end = new Date(req.query.end);
+  //TODO: if start > end -> 400
+  const result = await getBestProfession(start, end);
+  if (result.type === "PROFESSIONS_NOT_FOUND") {
+    return res.status(404).json({
+      error: result.message,
+    });
+  }
+  return res.status(200).json(result.data);
 });
 
 module.exports = app;
