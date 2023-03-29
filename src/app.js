@@ -4,6 +4,7 @@ const { sequelize } = require("./model");
 const { getProfile } = require("./middleware/getProfile");
 const { Op } = require("sequelize");
 const { listUnpaidJobs, payJob } = require("./service/job.service");
+const { depositMoney } = require("./service/profile.service");
 const app = express();
 app.use(bodyParser.json());
 app.set("sequelize", sequelize);
@@ -62,7 +63,9 @@ app.get("/jobs/unpaid", getProfile, async (req, res) => {
   const unpaidJobsResult = await listUnpaidJobs(req.profile);
   if (unpaidJobsResult.type === "JOBS_NOT_FOUND") {
     console.log(unpaidJobsResult.message);
-    return res.status(404).end();
+    return res.status(404).json({
+      error: unpaidJobsResult.message,
+    });
   }
   res.json(unpaidJobsResult.data);
 });
@@ -77,20 +80,60 @@ app.post("/jobs/:job_id/pay", getProfile, async (req, res) => {
     const result = await payJob(jobId, req.profile);
     console.log(result.message);
     if (result.type === "JOB_NOT_FOUND") {
-      return res.status(404).end();
+      return res.status(404).json({
+        error: result.message,
+      });
     }
     if (result.type === "NOT_ENOUGH_FUNDS") {
-      return res.status(400).end();
+      return res.status(400).json({
+        error: result.message,
+      });
     }
     if (result.type === "PAYMENT_DONE") {
-      return res.status(204).end();
+      return res.status(204).json({
+        error: result.message,
+      });
     }
     if (result.type === "PAYMENT_FAILED") {
-      return res.status(500).end();
+      return res.status(500).json({
+        error: result.message,
+      });
     }
   } catch (error) {
     console.error(`ERROR ${error}`);
-    return res.status(500).end();
+    return res.status(500).json({ error });
+  }
+});
+
+app.post("/balances/deposit/:userId", getProfile, async (req, res) => {
+  // NOTE: I'm assuming that the userId doesn't need to be the authenticated user
+  const userId = req.params.userId;
+  if (!userId) {
+    return res.status(400).json({
+      error: `Can't deposit without userId`,
+    });
+  }
+  const amount = req.body.amount;
+  if (!amount) {
+    return res.status(400).json({
+      error: `Can't deposit to userId=${userId} without amount`,
+    });
+  }
+
+  const result = await depositMoney(userId, amount, req.profile.id);
+  console.log(result.message);
+  if (result.type === "INVALID_AMOUNT") {
+    return res.status(400).json({
+      error: result.message,
+    });
+  }
+  if (result.type === "CLIENT_NOT_FOUND") {
+    return res.status(404).json({
+      error: result.message,
+    });
+  }
+  if (result.type === "DEPOSIT_DONE") {
+    return res.status(204).end();
   }
 });
 
