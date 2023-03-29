@@ -66,11 +66,14 @@ const getBestClients = async (startDate, endDate, limit = 2) => {
       },
     },
   });
-  const bestClients = bestClientsQuery.map((c) => ({
-    id: c.id,
-    fullName: c.firstName + c.lastName,
-    paid: c.paid,
-  }));
+  const bestClients = bestClientsQuery.map((c) => {
+    c = c.get({ plain: true });
+    return {
+      id: c.id,
+      fullName: c.firstName + " " + c.lastName,
+      paid: c.paid,
+    };
+  });
 
   if (!bestClients || !bestClients.length) {
     return new Result("CLIENTS_NOT_FOUND", `Clients not found, empty data`);
